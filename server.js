@@ -7,6 +7,8 @@ const firebase = require('firebase/app');
 const firestore = require('firebase/firestore');
 const crypto = require('crypto');
 
+require('dotenv').config();
+
 const firebaseConfig = {
   apiKey: "AIzaSyAHzoxUGSYMFTl1HIRtocBe7bStGsSyNVc",
   authDomain: "whiteboard-harsh.firebaseapp.com",
@@ -17,8 +19,21 @@ const firebaseConfig = {
   measurementId: "G-6E1H0V182V"
 };
 
+app.options('*', cors({
+  origin: '*'
+}));
+app.use(cors({
+  origin: '*'
+}));
 
-app.use(cors());
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    res.header("Access-Control-Allow-Methods", "PUT, POST, PATCH, DELETE, GET");
+    return res.status(200).json({});
+  }
+  next();
+});
+
 app.use(express.json());
 
 const firebaseApp = firebase.initializeApp(firebaseConfig)
@@ -33,37 +48,28 @@ const io = new Server(httpServer, {
 });
 
 io.on("connection", (socket) => {
-  console.log(`connected: ${socket.id}`)
 
   socket.on('connect-to-room', (data)=>{
-    console.log(`joined: ${data.roomKey}`)
     socket.join(data.roomKey);
   });
 
   socket.on('network-paint-start', (data) => {
-    console.log(`network-paint-start: ${data.coordinates.x}`);
-    io.to(data.roomKey).emit('paint-start', {
-      coordinates: data.coordinates
-    });
+    io.to(data.roomKey).emit('paint-start', data);
   });
 
   socket.on('network-paint-draw', (data) => {
-    console.log(`network-paint-draw: ${data.coordinates.x}`);
-    io.to(data.roomKey).emit('paint-draw', {
-      coordinates: data.coordinates
-    });
+    io.to(data.roomKey).emit('paint-draw', data);
   });
 
   socket.on('network-paint-stop', (data) => {
-    console.log(`network-paint-stop: ${data.coordinates.x}`);
-    io.to(data.roomKey).emit('paint-stop', {
-      coordinates: data.coordinates
-    });
+    io.to(data.roomKey).emit('paint-stop', data);
   });
 });
 
-httpServer.listen(4000, ()=> {
-    console.log("Server running at port 4000")
+let port = process.env.PORT || 3000;
+
+httpServer.listen(port, ()=> {
+    console.log(`Server running at port ${port}`)
 })
 
 function generateRoomId(length=5){
@@ -90,7 +96,6 @@ async function createNewRoom(data){
           user.socketId = data.users[0].socketId;
         }
       })
-      console.log(userList)
       await firestore.setDoc(doc.ref, {users: userList}, {merge: true});
       return {success: true, data: doc.data()}
     }else{
@@ -104,7 +109,6 @@ async function createNewRoom(data){
 }
 
 async function joinRoom(roomKey, user){
-  console.log(user)
   try{
     const roomQuery = firestore.query(firestore.collection(db, "rooms"), firestore.where("roomKey", "==", roomKey));
     const querySnapshot = await firestore.getDocs(roomQuery);
@@ -152,8 +156,7 @@ app.post('/create-room', (req, res) =>{
   createNewRoom(createParams)
     .then((result)=>{
       if(result.success == true){
-        console.log(result)
-        res.end(JSON.stringify({status: 200, roomKey: result.data.roomKey}))
+        res.json({status: 200, roomKey: result.data.roomKey})
       }else{
         res.end(JSON.stringify({status: 500}))
       }
@@ -162,7 +165,6 @@ app.post('/create-room', (req, res) =>{
 
 
 app.post('/join-room/:roomKey', (req, res) =>{
-  console.log(req.data);
   let user = {
     sessionId: req.body.sessionId,
     socketId: req.body.socketId
@@ -172,9 +174,12 @@ app.post('/join-room/:roomKey', (req, res) =>{
 
   joinRoom(roomKey, user)
     .then((result)=>{
-      console.log(result)
       if(result.success == true){
         res.end(JSON.stringify({success: true, roomKey: roomKey}))
       }
     });
+});
+
+app.get('/', (req, res) =>{ 
+  res.end(JSON.stringify({success: true}))
 });
