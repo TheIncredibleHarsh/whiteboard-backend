@@ -27,7 +27,7 @@ app.use(cors({
 }));
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://etchsketch.xyz");
+  res.header("Access-Control-Allow-Origin", process.env.ALLOW_ORIGIN);
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   res.header("Access-Control-Allow-Methods", "PUT, POST, PATCH, DELETE, GET");
   next();
@@ -53,15 +53,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on('network-paint-start', (data) => {
-    io.to(data.roomKey).emit('paint-start', data);
+    socket.broadcast.to(data.roomKey).emit('paint-start', data);
   });
 
   socket.on('network-paint-draw', (data) => {
-    io.to(data.roomKey).emit('paint-draw', data);
+    socket.broadcast.to(data.roomKey).emit('paint-draw', data);
   });
 
   socket.on('network-paint-stop', (data) => {
-    io.to(data.roomKey).emit('paint-stop', data);
+    socket.broadcast.to(data.roomKey).emit('paint-stop', data);
   });
 });
 
